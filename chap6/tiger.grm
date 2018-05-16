@@ -1,0 +1,169 @@
+(* AST    Kevin Legarreta   801-14-3452   *)
+(*Create a Absyn structure named A*)
+structure A = Absyn
+
+(*term*)
+%%
+%term
+    EOF 
+  | ID of string
+  | INT of int | STRING of string 
+  | COMMA | COLON | SEMICOLON | LPAREN | RPAREN | LBRACK | RBRACK 
+  | LBRACE | RBRACE | DOT 
+  | PLUS | MINUS | TIMES | DIVIDE | EQ | NEQ | LT | LE | GT | GE
+  | AND | OR | ASSIGN
+  | ARRAY | IF | THEN | ELSE | WHILE | FOR | TO | DO | LET | IN | END | OF 
+  | BREAK | NIL
+  | FUNCTION | VAR | TYPE 
+
+(*Looking at the file Absyn.sml we can deduced the types of each term*)
+%nonterm  exp of A.exp              (*exp is of type exp*)
+| program of A.exp                  (*a program is only one exp*)
+| expseq  of  (A.exp * pos) list    (*expseq is (exp * pos) *)
+| explist of A.exp list             (*explist is a list of exp*)
+| binop of A.oper                   (*Binop is a oper but this excludes the
+                                     & and the | page 99 of book*)
+| lvalue of A.var                   (*lvalue is of type var*)
+| declist of A.dec list             (*declist is a list of dec*)
+| dec of A.dec                      (*dec is of type dec*)
+| typefields of A.field list        (*typefields is a list of fields*)
+| typefield of A.field              (*typefield is of type field*)
+
+%pos int
+%verbose
+%start program
+%eop EOF
+%noshift EOF
+
+%name Tiger
+
+%keyword WHILE FOR TO BREAK LET IN END FUNCTION VAR TYPE ARRAY IF THEN ELSE 
+	DO OF NIL
+
+%prefer THEN ELSE LPAREN
+
+
+%nonassoc EQ NEQ LT LE GT GE
+%left PLUS MINUS
+%left TIMES DIVIDE
+
+%value ID ("bogus")
+%value INT (1)
+%value STRING ("")
+
+%%
+
+(*program call the exp sending the one exp present in the *.tig file*)
+program: exp                      (exp)
+
+(*exp has multiple options in the grammar.*)
+(*lvalue is a VarExp that is sent to the variable lvalue down below*)
+exp: lvalue                       (A.VarExp lvalue)
+
+(*This just parse the word NIL*)
+| NIL                             (A.NilExp)
+
+(*This just parse the integers*)
+| INT                             (A.IntExp INT)
+
+(*This just parse the strings*)
+
+| STRING                          (A.StringExp (STRING, STRINGleft))
+
+(*This parses the assign exp*)
+| lvalue ASSIGN exp               (A.AssignExp {var=lvalue, exp=exp,
+                                   pos=ASSIGNleft})
+
+(*This parses the if then without else*)
+| IF exp THEN exp                 (A.IfExp {test=exp1, then'= exp2, 
+                                  else'=NONE, pos=IFleft})
+
+(*This parses the if then with else*)
+
+| IF exp THEN exp ELSE exp        (A.IfExp {test=exp1, then'= exp2, 
+                                  else'=SOME exp3, pos=IFleft})
+
+(*This parses the & operator as a if then else expression*)
+| exp AND exp                     (A.IfExp {test=exp1, then'= exp2, 
+                                  else'=SOME(A.IntExp(0)), pos=exp1left})
+
+(*This parses the | operator as a if then else expression*)
+| exp OR exp                      (A.IfExp {test=exp1, then'= A.IntExp(1), 
+                                  else'=SOME exp2, pos=exp1left})
+
+(*Parses every binop operation without & and |*)
+| exp TIMES exp                   (A.OpExp {left=exp1,oper=A.TimesOp,right=exp2,pos=exp1left})
+| exp DIVIDE exp                   (A.OpExp {left=exp1,oper=A.DivideOp,right=exp2,pos=exp1left})
+| exp PLUS exp                   (A.OpExp {left=exp1,oper=A.PlusOp,right=exp2,pos=exp1left})
+| exp MINUS exp                   (A.OpExp {left=exp1,oper=A.MinusOp,right=exp2,pos=exp1left})
+| exp EQ exp                   (A.OpExp {left=exp1,oper=A.EqOp,right=exp2,pos=exp1left})
+| exp NEQ exp                   (A.OpExp {left=exp1,oper=A.NeqOp,right=exp2,pos=exp1left})
+| exp LT exp                   (A.OpExp {left=exp1,oper=A.LtOp,right=exp2,pos=exp1left})
+| exp GT exp                   (A.OpExp {left=exp1,oper=A.GtOp,right=exp2,pos=exp1left})
+| exp LE exp                   (A.OpExp {left=exp1,oper=A.LeOp,right=exp2,pos=exp1left})
+| exp GE exp                   (A.OpExp {left=exp1,oper=A.GeOp,right=exp2,pos=exp1left})
+
+
+
+
+(*This parses the call of a function exp*)
+| ID LPAREN explist RPAREN        (A.CallExp {func=Symbol.symbol ID,
+                                   args=explist, pos= IDleft})
+
+(*This parses a sequence of exp between ()*)
+| LPAREN expseq RPAREN            (A.SeqExp(expseq))
+
+(*This parses the let in end with declist and expseq*)
+| LET declist IN expseq END       (A.LetExp {decs=declist, 
+                                  body=A.SeqExp(expseq),
+                                  pos=LETleft})
+
+(*lvalue parses variables*)
+lvalue: ID                     (A.SimpleVar (Symbol.symbol ID,IDleft))
+
+(*explist handles the list of exp by giving the list of AST for each of the exp*)
+explist: exp                   ([exp])
+| explist COMMA exp            (explist @ [exp])
+
+(*expseq handles sequence of exp by giving the AST for each of the exp*)
+expseq: exp                    ((exp, expleft) :: nil)
+| exp SEMICOLON expseq         ((exp, expleft) :: expseq)
+
+(*declist handles the list of dec by giving the list of AST for all of the decs*)
+declist: dec  (dec :: nil)
+| dec declist (dec :: declist)
+
+
+(*dec handles the type,var and function decclarations*)
+dec: TYPE ID EQ ID             (A.TypeDec [{name=Symbol.symbol ID1,
+                               ty=A.NameTy(Symbol.symbol ID2,ID2left),
+                              pos=TYPEleft}])
+
+
+| VAR ID COLON ID ASSIGN exp   (A.VarDec {name=Symbol.symbol ID1,
+                               init=exp, pos=VARleft, escape=ref true,
+                              typ=SOME (Symbol.symbol ID2, ID2left)})
+
+
+| FUNCTION ID LPAREN typefields RPAREN COLON ID EQ exp   
+                              (A.FunctionDec [{name=Symbol.symbol ID1,
+                              params=typefields, 
+                              result=SOME(Symbol.symbol ID2, ID2left), 
+                              body=exp, pos=FUNCTIONleft}])
+
+| FUNCTION ID LPAREN typefields RPAREN EQ exp   
+                              (A.FunctionDec [{name=Symbol.symbol ID,
+                              params=typefields, 
+                              result=NONE, 
+                              body=exp, pos=FUNCTIONleft}])
+
+(*typefields handles all the typefields from 1 if not with comma or more if with comma*)
+typefields: typefield          (typefield::nil)
+| typefield COMMA typefields   (typefield::typefields)
+
+(*typefield handle type declarations*)
+typefield: ID COLON ID         ({name = Symbol.symbol ID1, escape=ref true,
+                               typ=Symbol.symbol ID2,pos=ID1left})
+
+| ID                            ({name = Symbol.symbol ID, escape=ref true,
+                               typ=Symbol.symbol "int",pos=IDleft})

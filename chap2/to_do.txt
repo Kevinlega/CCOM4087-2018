@@ -1,0 +1,63 @@
+exp:
+    lvalue
+
+
+
+    int         done
+    string      done
+    <INITIAL>\"[ -~]* \" => (Tokens.STRING(yytext,yypos, yypos+(size (yytext))));
+
+    \"[\x00-\x21\x23-\7f]*\"
+
+    
+
+[\x00-\x7F]
+
+
+
+
+    exp binop exp
+    lvalue := exp
+    id ( explist )
+    ( expseq )
+    let declist in expseq end
+    if exp then exp
+    if exp then exp else exp
+
+lvalue:
+    # These are simple variables
+    id   creo que ya
+
+binop:
+    + - * / = <> < > <= >= & |
+[\+\-\*\/\=\&\|\<\>] => (Tokens.BINOP(yypos, yypos+(size (yytext))));
+
+(<=)(>=)(<>)
+
+
+declist:
+    dec
+    dec declist
+
+dec: 
+    type id = id
+    var id : id := exp
+    function id ( typefields ) : id = exp
+
+expseq:
+    exp
+    expseq ; exp
+
+explist:
+    exp
+    explist , exp
+
+typefields:
+    typefield
+    typefield , typefields
+
+typefield:
+    id : id
+
+
+comment (/*)[ -~]*(*/) => (Tokens.COMMENTS(yytext,yypos, yypos+(size (yytext))));

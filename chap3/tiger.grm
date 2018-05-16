@@ -1,0 +1,93 @@
+%%
+%term
+    EOF 
+  | ID of string
+  | INT of int | STRING of string 
+  | COMMA | COLON | SEMICOLON | LPAREN | RPAREN | LBRACK | RBRACK 
+  | LBRACE | RBRACE | DOT 
+  | PLUS | MINUS | TIMES | DIVIDE | EQ | NEQ | LT | LE | GT | GE
+  | AND | OR | ASSIGN
+  | ARRAY | IF | THEN | ELSE | WHILE | FOR | TO | DO | LET | IN | END | OF 
+  | BREAK | NIL
+  | FUNCTION | VAR | TYPE 
+
+%nonterm  exp
+| program 
+| expseq 
+| explist 
+| binop 
+| lvalue 
+| declist 
+| dec 
+| typefields 
+| typefield
+
+%pos int
+%verbose
+%start program
+%eop EOF
+%noshift EOF
+
+%name Tiger
+
+%keyword WHILE FOR TO BREAK LET IN END FUNCTION VAR TYPE ARRAY IF THEN ELSE 
+	DO OF NIL
+
+%prefer THEN ELSE LPAREN
+
+%value ID ("bogus")
+%value INT (1)
+%value STRING ("")
+
+
+%%
+
+program: exp                      (exp)
+
+exp:  lvalue                      (lvalue)
+| NIL                             ()
+| INT                             ()
+| STRING                          ()
+| exp binop exp                   (exp1,binop,exp2)
+| lvalue ASSIGN exp               (lvalue,exp)
+| ID LPAREN explist RPAREN        (explist)
+| LPAREN expseq RPAREN            (expseq)
+| LET declist IN expseq END       (declist,expseq)
+| IF exp THEN exp                 (exp1,exp2)
+| IF exp THEN exp ELSE exp        (exp1,exp2,exp3)
+
+lvalue:  ID       ()
+
+binop:  PLUS      () 
+| MINUS           ()
+| TIMES           ()
+| DIVIDE          ()
+| EQ              ()
+| NEQ             ()
+| LT              ()
+| GT              ()
+| LE              ()
+| GE              ()
+| AND             ()
+| OR              ()
+
+
+declist: dec      (dec)
+| dec declist     (dec, declist)
+
+
+dec: TYPE ID EQ ID                                       ()
+| VAR ID COLON ID ASSIGN exp                             (exp)
+| FUNCTION ID LPAREN typefields RPAREN COLON ID EQ exp   (typefields,exp)
+
+
+expseq: exp                    ()
+|  expseq SEMICOLON exp        (expseq,exp)
+
+explist: exp                   (exp)
+|  explist COMMA exp           (explist, exp)
+
+typefields: typefield          (typefield)
+| typefield COMMA typefields   (typefield,typefields)
+
+typefield: ID COLON ID         ()
